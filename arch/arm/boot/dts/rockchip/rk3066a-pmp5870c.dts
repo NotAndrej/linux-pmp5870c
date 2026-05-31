@@ -1,0 +1,702 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2013 MundoReader S.L.
+ * Author: Heiko Stuebner <heiko@sntech.de>
+ *
+ * Adapted for Prestigio MultiPad 7.0 Ultra Duo PMP5870C
+ */
+
+/dts-v1/;
+#include <dt-bindings/input/input.h>
+#include "rk3066a.dtsi"
+
+/ {
+	model = "Prestigio MultiPad 7.0 Ultra Duo PMP5870C";
+	compatible = "prestigio,pmp5870c", "rockchip,rk3066a";
+
+	aliases {
+		mmc0 = &mmc0;
+		mmc1 = &mmc1;
+	};
+
+	chosen {
+		stdout-path = &uart2;
+	};
+
+	memory@60000000 {
+		device_type = "memory";
+		reg = <0x60000000 0x40000000>;
+	};
+
+	adc-keys {
+		compatible = "adc-keys";
+		io-channels = <&saradc 1>;
+		io-channel-names = "buttons";
+		keyup-threshold-microvolt = <2500000>;
+		poll-interval = <100>;
+
+		key-volume-up {
+			label = "GPIO Key Vol+";
+			linux,code = <KEY_VOLUMEUP>;
+			press-threshold-microvolt = <0>;
+		};
+	};
+
+	panel_bl: backlight {
+		compatible = "pwm-backlight";
+		pwms = <&pwm2 0 26860>;
+
+		brightness-levels = <100 75 50 25 12 6 3 0>;
+		default-brightness-level = <6>;
+
+		enable-gpios = <&gpio6 RK_PB3 GPIO_ACTIVE_HIGH>;
+		post-pwm-on-delay-ms = <100>;
+		pwm-off-delay-ms = <100>;
+	};
+
+	lvds-encoder {
+		compatible = "lvds-encoder";
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+
+				lvds_in_vop0: endpoint {
+					remote-endpoint = <&vop0_out_lvds>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+
+				lvds_out_panel: endpoint {
+					remote-endpoint = <&panel_in_lvds>;
+				};
+			};
+		};
+	};
+
+	panel {
+		compatible = "panel-lvds";
+		backlight = <&panel_bl>;
+		enable-gpios = <&gpio4 RK_PC7 GPIO_ACTIVE_HIGH
+				&gpio4 RK_PD2 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio4 RK_PD1 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_cs &lcd_rst &lcd_standby>;
+		power-supply = <&vcc_lcd>;
+
+		data-mapping = "jeida-24";
+		height-mm = <94>;
+		width-mm = <150>;
+
+		panel-timing {
+			/* 1280x800 @ ~53Hz, dclk from stock dmesg: 66500000 */
+			clock-frequency = <66500000>;
+			hactive = <1280>;
+			vactive = <800>;
+			hback-porch = <100>;
+			hfront-porch = <120>;
+			hsync-len = <100>;
+			vback-porch = <10>;
+			vfront-porch = <15>;
+			vsync-len = <10>;
+		};
+
+		port {
+			panel_in_lvds: endpoint {
+				remote-endpoint = <&lvds_out_panel>;
+			};
+		};
+	};
+
+	vcc_lcd: regulator-lcd {
+		compatible = "regulator-fixed";
+		enable-active-low;
+		regulator-name = "vcc-lcd";
+		gpio = <&gpio6 RK_PB4 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_en>;
+		vin-supply = <&vcc_io>;
+	};
+
+	vdd_log: regulator-vdd-log {
+		compatible = "pwm-regulator";
+		pwms = <&pwm3 0 1000>;
+		regulator-name = "vdd_log";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <1200000>;
+		regulator-always-on;
+		voltage-table = <1000000 100>,
+				<1200000 42>;
+		status = "okay";
+	};
+
+	vcc_otg: regulator-usb-otg {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio0 RK_PA5 GPIO_ACTIVE_HIGH>;
+		pinctrl-0 = <&otg_drv>;
+		pinctrl-names = "default";
+		regulator-always-on;
+		regulator-name = "vcc_otg";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		vin-supply = <&vcc_io>;
+	};
+
+	vcc_sd0: regulator-fixed {
+		compatible = "regulator-fixed";
+		regulator-name = "sdmmc-supply";
+		regulator-min-microvolt = <3000000>;
+		regulator-max-microvolt = <3000000>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sdmmc_pwr>;
+		gpio = <&gpio3 RK_PA7 GPIO_ACTIVE_LOW>;
+		vin-supply = <&vcc_io>;
+	};
+
+	/*
+	 * WARNING: on bq-curie, enabling vccio_wl conflicts with USB.
+	 * This may or may not apply to pmp5870c — needs testing.
+	 * vccio_wl powers both the panel and the RTL8188EU wifi (USB).
+	 * Stock dmesg shows vdac = vccio_wl @ 1.8V via TPS65910.
+	 */
+	vccio_wl: vccio-wl {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio0 RK_PA6 GPIO_ACTIVE_HIGH>;
+		pinctrl-0 = <&vccio_wl_on>;
+		pinctrl-names = "default";
+		regulator-name = "vccio_wl";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		vin-supply = <&vcc_io>;
+	};
+
+	vsys: regulator-vsys {
+		compatible = "regulator-fixed";
+		regulator-name = "vsys";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		regulator-boot-on;
+	};
+
+	hdmi_con {
+		compatible = "hdmi-connector";
+		type = "c";
+
+		port {
+			hdmi_con_in: endpoint {
+				remote-endpoint = <&hdmi_out_con>;
+			};
+		};
+	};
+
+	codec-en {
+		compatible = "regulator-fixed";
+		regulator-name = "codec-en";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		gpio = <&gpio4 RK_PD7 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&codec_en_pin>;
+	};
+
+	dcr-en {
+		compatible = "regulator-fixed";
+		regulator-name = "dcr-en";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-low;
+		gpio = <&gpio4 RK_PB7 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&dcr_en_pin>;
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		autorepeat;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pwr_key &vol_key &usb_int>;
+
+		key-power {
+			gpios = <&gpio6 RK_PA2 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_POWER>;
+			label = "GPIO Key Power";
+			linux,input-type = <1>;
+			debounce-interval = <100>;
+			wakeup-source;
+		};
+
+		key-volume-down {
+			gpios = <&gpio4 RK_PC5 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_VOLUMEDOWN>;
+			label = "GPIO Key Vol-";
+			linux,input-type = <1>;
+			debounce-interval = <100>;
+		};
+
+		key-wake-on-usb {
+			label = "Wake-on-USB";
+			gpios = <&gpio6 RK_PA3 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_WAKEUP>;
+			wakeup-source;
+		};
+	};
+
+	gpio-poweroff {
+		compatible = "gpio-poweroff";
+		gpios = <&gpio6 RK_PB0 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pwr_hold>;
+		active-delay-ms = <3000>;
+	};
+};
+
+&cpu0 {
+	cpu-supply = <&vdd_arm>;
+};
+
+&cpu1 {
+	cpu-supply = <&vdd_arm>;
+};
+
+&gpu {
+	status = "okay";
+};
+
+&hdmi {
+	status = "okay";
+};
+
+&hdmi_in_vop1 {
+	status = "okay";
+};
+
+&hdmi_out {
+	hdmi_out_con: endpoint {
+		remote-endpoint = <&hdmi_con_in>;
+	};
+};
+
+&hdmi_sound {
+	status = "okay";
+};
+
+&i2c0 {
+	clock-frequency = <400000>;
+	status = "okay";
+
+	/*
+	 * BMA222E accelerometer
+	 * Stock dmesg: "BMA222E registered I2C driver" at i2c-0, addr 0x18
+	 * Orientation matrix from stock init.rc factory section:
+	 * gsensor={-1,0,0,0,0,1,0,-1,0}
+	 */
+	bma222e: accel@18 {
+		compatible = "bosch,bma222e";
+		reg = <0x18>;
+		mount-matrix = "-1", "0", "0",
+			       "0", "0", "1",
+			       "0", "-1", "0";
+	};
+
+	/* ES8323 audio codec, addr 0x10 confirmed from stock dmesg */
+	es8323: codec@10 {
+		compatible = "everest,es8323";
+		reg = <0x10>;
+		#sound-dai-cells = <0>;
+	};
+};
+
+&i2c1 {
+	status = "okay";
+	clock-frequency = <400000>;
+
+	tps: tps@2d {
+		reg = <0x2d>;
+
+		interrupt-parent = <&gpio6>;
+		interrupts = <RK_PA4 IRQ_TYPE_LEVEL_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pmic_int>;
+		status = "okay";
+		vcc1-supply = <&vsys>;
+		vcc2-supply = <&vsys>;
+		vcc3-supply = <&vsys>;
+		vcc4-supply = <&vcc_io>;
+		vcc5-supply = <&vcc_io>;
+		vcc6-supply = <&vsys>;
+		vcc7-supply = <&vsys>;
+		vccio-supply = <&vsys>;
+
+		regulators {
+			vcc_rtc: regulator@0 {
+				regulator-name = "vcc_rtc";
+				regulator-always-on;
+			};
+
+			vcc_io: regulator@1 {
+				regulator-name = "vcc_io";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vdd_arm: regulator@2 {
+				regulator-name = "vdd_arm";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <1500000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vcc_ddr: regulator@3 {
+				regulator-name = "vcc_ddr";
+				regulator-min-microvolt = <900000>;
+				regulator-max-microvolt = <1500000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vcc18_cif: regulator@5 {
+				regulator-name = "vcc18_cif";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <2700000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vdd_11: regulator@6 {
+				regulator-name = "vdd_11";
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <1800000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vcc_25: regulator@7 {
+				regulator-name = "vcc_25";
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <2500000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vcc_18: regulator@8 {
+				regulator-name = "vcc_18";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <2850000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vcc25_hdmi: regulator@9 {
+				regulator-name = "vcc25_hdmi";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vcca_33: regulator@10 {
+				regulator-name = "vcca_33";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vcc_tp: regulator@11 {
+				regulator-name = "vcc_tp";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vcc28_cif: regulator@12 {
+				regulator-name = "vcc28_cif";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+		};
+	};
+};
+
+&i2c2 {
+	clock-frequency = <400000>;
+	status = "okay";
+
+	/*
+	 * BYD BF6932 touchscreen
+	 * Confirmed from stock dmesg:
+	 *   "Install BYD BF6932 Touchscreen driver successfully"
+	 *   i2c-2, addr 0x52 (from i2c.txt: 2-0052)
+	 * TODO: needs a mainline driver port (byd693x_ts.c from vendor BSP)
+	 * interrupt and reset GPIOs are assumed same as curie ft5306 — VERIFY!
+	 */
+	byd6932: touchscreen@52 {
+		compatible = "byd,bf6932"; /* placeholder — no mainline driver yet */
+		reg = <0x52>;
+		interrupt-parent = <&gpio4>;
+		interrupts = <RK_PC2 IRQ_TYPE_EDGE_FALLING>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&tp_int &tp_rst>;
+		reset-gpios = <&gpio4 RK_PD0 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <1280>;
+		touchscreen-size-y = <800>;
+		vcc-supply = <&vcc_tp>;
+	};
+};
+
+&i2c3 {
+	clock-frequency = <400000>;
+	status = "disabled";
+};
+
+&i2c4 {
+	clock-frequency = <400000>;
+	status = "disabled";
+};
+
+/* must be included after &tps gets defined */
+#include "../tps65910.dtsi"
+
+&i2s0 {
+	status = "okay";
+};
+
+&i2s1 {
+	status = "okay";
+};
+
+&i2s2 {
+	status = "okay";
+};
+
+&mmc0 { /* sdmmc */
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
+	vmmc-supply = <&vcc_sd0>;
+	bus-width = <4>;
+	cap-mmc-highspeed;
+	cap-sd-highspeed;
+	disable-wp;
+	cd-gpio = <&gpio3 RK_PB6 GPIO_ACTIVE_LOW>;
+};
+
+/*
+ * mmc1/sdio: RTL8188EU is USB, NOT sdio — so mmc1 is unused on pmp5870c
+ * Keeping disabled for now. The wifi dongle is on the internal USB host.
+ */
+&mmc1 {
+	status = "disabled";
+};
+
+&pinctrl {
+	pcfg_output_high: pcfg-output-high {
+		output-high;
+	};
+
+	pcfg_output_low: pcfg-output-low {
+		output-low;
+	};
+
+	bma222e {
+		accel_int: accel-int {
+			rockchip,pins = <4 RK_PC0 RK_FUNC_GPIO &pcfg_pull_default>;
+		};
+	};
+
+	keys {
+		pwr_hold: pwr-hold {
+			rockchip,pins = <6 RK_PB0 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+
+		pwr_key: pwr-key {
+			rockchip,pins = <0 RK_PA4 RK_FUNC_GPIO &pcfg_pull_default>;
+		};
+
+		vol_key: vol-key {
+			rockchip,pins = <6 RK_PA2 RK_FUNC_GPIO &pcfg_pull_default>;
+		};
+	};
+
+	codec_en {
+		codec_en_pin: codec-en-pin {
+			rockchip,pins = <4 RK_PD7 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+	};
+
+	dcr_en {
+		dcr_en_pin: dcr-en-pin {
+			rockchip,pins = <4 RK_PB7 RK_FUNC_GPIO &pcfg_output_low>;
+		};
+	};
+
+	usb_otg {
+		otg_drv: otg-drv {
+			rockchip,pins = <0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_default>;
+		};
+
+		usb_int: usb-int {
+			rockchip,pins = <6 RK_PA3 RK_FUNC_GPIO &pcfg_pull_default>;
+		};
+	};
+
+	tps {
+		pmic_int: pmic-int {
+			rockchip,pins = <6 RK_PA4 RK_FUNC_GPIO &pcfg_pull_default>;
+		};
+	};
+
+	display {
+		lcd_cs: lcd-cs {
+			rockchip,pins = <4 RK_PC7 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+
+		lcd_standby: lcd-standby {
+			rockchip,pins = <4 RK_PD2 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+
+		lcd_rst: lcd-rst {
+			rockchip,pins = <4 RK_PD1 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+
+		lcd_en: lcd-en {
+			rockchip,pins = <6 RK_PB4 RK_FUNC_GPIO &pcfg_output_low>;
+		};
+	};
+
+	byd6932 {
+		tp_int: tp-int {
+			/* assumed same as curie ft5306 — VERIFY against hardware! */
+			rockchip,pins = <4 RK_PC2 RK_FUNC_GPIO &pcfg_pull_default>;
+		};
+
+		tp_rst: tp-rst {
+			rockchip,pins = <4 RK_PD0 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	sdmmc {
+		sdmmc_pwr: sdmmc-pwr {
+			rockchip,pins = <3 RK_PA7 RK_FUNC_GPIO &pcfg_pull_default>;
+		};
+	};
+
+	rk903 {
+		bt_host_wake: bt-host-wake {
+			rockchip,pins = <6 RK_PA7 RK_FUNC_GPIO &pcfg_pull_default>;
+		};
+
+		bt_reg_on: bt-reg-on {
+			rockchip,pins = <3 RK_PC7 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+
+		bt_rst: bt-rst {
+			rockchip,pins = <3 RK_PD1 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		bt_wake: bt-wake {
+			rockchip,pins = <3 RK_PC6 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+
+		vccio_wl_on: vccio-wl-on {
+			rockchip,pins = <0 RK_PA6 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+	};
+};
+
+&saradc {
+	vref-supply = <&vcc_25>;
+	status = "okay";
+};
+
+&tsadc {
+	status = "okay";
+};
+
+/* BT is RK903 uart-based, BT3.0 — different from curie's bcm4330 */
+&uart0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
+	uart-has-rtscts;
+	status = "okay";
+
+	bluetooth {
+		compatible = "realtek,rk903-bt"; /* TODO: verify correct compat string */
+		max-speed = <1500000>;
+		device-wakeup-gpios = <&gpio3 RK_PC6 GPIO_ACTIVE_HIGH>;
+		host-wakeup-gpios = <&gpio6 RK_PA7 GPIO_ACTIVE_LOW>;
+		shutdown-gpios = <&gpio3 RK_PC7 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio3 RK_PD1 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&bt_host_wake &bt_reg_on &bt_rst &bt_wake>;
+	};
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&uart2 {
+	status = "okay";
+};
+
+&uart3 {
+	status = "disabled";
+};
+
+&usb_otg {
+	status = "okay";
+	dr_mode = "peripheral";
+};
+
+&usbphy {
+	status = "okay";
+};
+
+&vop0 {
+	status = "okay";
+};
+
+&vop0_out {
+	vop0_out_lvds: endpoint@1 {
+		reg = <1>;
+		remote-endpoint = <&lvds_in_vop0>;
+	};
+};
+
+&vop1 {
+	status = "okay";
+};
+
+&pwm0 {
+	status = "disabled";
+};
+
+&pwm1 {
+	status = "disabled";
+};
+
+&pwm2 {
+	status = "okay";
+};
+
+&pwm3 {
+	status = "okay";
+};
+
+&wdt {
+	status = "okay";
+};
