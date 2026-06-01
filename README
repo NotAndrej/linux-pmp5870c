@@ -1,18 +1,13 @@
-Linux kernel
-============
+Mainline Linux kernel fork targeting the Prestigio PMP5870C (RK3066).
 
-There are several guides for kernel developers and users. These guides can
-be rendered in a number of formats, like HTML and PDF. Please read
-Documentation/admin-guide/README.rst first.
+Based on archeYR's bq-curie branch. The PMP5870C uses:
+| Component | Status |
+|-----------|--------|
+| Display 1280x800 | DTS only, untested |
+| BYD BF6932 touch | No driver yet |
+| ES8323 audio | Mainline |
+| BMA222E accel | Mainline |
+| RTL8188EU wifi | Mainline |
+| RK903 bluetooth | Mainline |
 
-In order to build the documentation, use ``make htmldocs`` or
-``make pdfdocs``.  The formatted documentation can also be read online at:
-
-    https://www.kernel.org/doc/html/latest/
-
-There are various text files in the Documentation/ subdirectory,
-several of them using the reStructuredText markup notation.
-
-Please read the Documentation/process/changes.rst file, as it contains the
-requirements for building and running the kernel, and information about
-the problems which may result by upgrading your kernel.
+Manufacturer refused to provide GPL source. We did it anyway.
