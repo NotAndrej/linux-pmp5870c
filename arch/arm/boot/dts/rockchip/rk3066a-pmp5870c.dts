@@ -81,6 +81,7 @@
 	panel {
 		compatible = "panel-lvds";
 		backlight = <&panel_bl>;
+		rotation = <180>;
 		enable-gpios = <&gpio4 RK_PC7 GPIO_ACTIVE_HIGH
 				&gpio4 RK_PD2 GPIO_ACTIVE_HIGH>;
 		reset-gpios = <&gpio4 RK_PD1 GPIO_ACTIVE_HIGH>;
@@ -95,8 +96,8 @@
 		panel-timing {
 			/* 1280x800 @ ~53Hz, dclk from stock dmesg: 66500000 */
 			clock-frequency = <66500000>;
-			hactive = <1280>;
-			vactive = <800>;
+			hactive = <800>;
+			vactive = <1280>;
 			hback-porch = <100>;
 			hfront-porch = <120>;
 			hsync-len = <100>;
