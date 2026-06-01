@@ -10,4 +10,12 @@ Based on archeYR's bq-curie branch. The PMP5870C uses:
 | RTL8188EU wifi | Mainline |
 | RK903 bluetooth | Mainline |
 
+## Current status
+
+- Linux 6.16 boots
+- Framebuffer output works
+- Display orientation needs fixing
+- Root filesystem boot pending
+- Touchscreen driver pending
+
 Manufacturer refused to provide GPL source. We did it anyway.
